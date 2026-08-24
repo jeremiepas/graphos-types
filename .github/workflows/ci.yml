@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: [self-hosted, kubernetes, haskell-runner]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/devenv-action@v2
+      - run: devenv tasks run ci:lint
+
+  build:
+    runs-on: [self-hosted, kubernetes, haskell-runner]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/devenv-action@v2
+      - run: devenv tasks run ci:build
+
+  test:
+    needs: build
+    runs-on: [self-hosted, kubernetes, haskell-runner]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/devenv-action@v2
+      - run: devenv tasks run ci:test
