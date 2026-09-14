@@ -1,0 +1,60 @@
+cabal-version:      3.0
+name:               graphos-types
+version:            0.1.0.0
+synopsis:           Core data types for Graphos
+description:        Self-contained, dependency-light core types shared across Graphos services.
+license:            MIT
+license-file:       LICENSE
+author:             Graphos maintainers
+maintainer:         dev@example.com
+build-type:         Simple
+category:           data
+extra-source-files: README.md
+tested-with:        ghc ==9.10.3
+
+flag dev
+  description: Enable development mode (builds the test-suite)
+  default:     False
+
+common graphos-common
+  default-language:   Haskell2010
+  default-extensions: LambdaCase
+                     DeriveGeneric
+                     OverloadedStrings
+                     TypeApplications
+  ghc-options:        -Wall -Wcompat -Wincomplete-uni-patterns
+                    -Wincomplete-record-updates -Wredundant-constraints
+
+library
+  import:           graphos-common
+  hs-source-dirs:   src
+  exposed-modules:  Graphos.Types
+                   Graphos.Types.Node
+                   Graphos.Types.Edge
+                   Graphos.Types.Graph
+                   Graphos.Types.Analysis
+                   Graphos.Types.GraphFile
+                   Graphos.Types.Writer
+                   Graphos.Types.Ingest
+  build-depends:    base >=4.14 && <5
+                  , aeson
+                  , text
+                  , containers
+                  , deepseq
+                  , time
+                  , text-short
+
+test-suite spec
+  import:           graphos-common
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   tests
+  main-is:          Spec.hs
+  other-modules:    Graphos.TypesSpec
+  build-depends:    base
+                  , hspec
+                  , QuickCheck
+                  , aeson
+                  , containers
+                  , text
+                  , text-short
+                  , graphos-types

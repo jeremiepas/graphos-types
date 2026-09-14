@@ -1,0 +1,126 @@
+-- | Analysis result types for the knowledge graph.
+-- Pure data types with no IO dependencies.
+module Graphos.Types.Analysis
+  ( -- * Analysis types
+    Analysis(..)
+  , GodNode(..)
+  , SurprisingConnection(..)
+  , SuggestedQuestion(..)
+    -- * Community aggregate types
+  , CommunityAggregate(..)
+  ) where
+
+import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), withObject)
+import Data.Text (Text)
+import GHC.Generics (Generic)
+
+import Graphos.Types.Edge (Confidence)
+import Graphos.Types.Graph (CommunityMap, CohesionMap)
+import Graphos.Types.Node (NodeId)
+
+-- | Analysis results
+data Analysis = Analysis
+  { analysisCommunities :: !CommunityMap
+  , analysisCohesion     :: !CohesionMap
+  , analysisGodNodes     :: ![GodNode]
+  , analysisSurprises    :: ![SurprisingConnection]
+  , analysisQuestions    :: ![SuggestedQuestion]
+  } deriving (Eq, Show)
+
+-- | A god node (high-degree hub)
+data GodNode = GodNode
+  { gnId    :: NodeId
+  , gnLabel :: Text
+  , gnEdges :: Int
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON GodNode where
+  toJSON g = object
+    [ "id"     .= gnId g
+    , "label"  .= gnLabel g
+    , "edges"  .= gnEdges g
+    ]
+
+instance FromJSON GodNode where
+  parseJSON = withObject "GodNode" $ \v -> GodNode
+    <$> v .: "id"
+    <*> v .: "label"
+    <*> v .: "edges"
+
+-- | A surprising cross-community connection
+data SurprisingConnection = SurprisingConnection
+  { scSource      :: Text
+  , scTarget      :: Text
+  , scSourceFiles :: [Text]
+  , scConfidence  :: Confidence
+  , scRelation    :: Text
+  , scWhy         :: Text
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON SurprisingConnection where
+  toJSON s = object
+    [ "source"        .= scSource s
+    , "target"        .= scTarget s
+    , "source_files"  .= scSourceFiles s
+    , "confidence"    .= scConfidence s
+    , "relation"      .= scRelation s
+    , "why"           .= scWhy s
+    ]
+
+-- | A suggested question from graph analysis
+data SuggestedQuestion = SuggestedQuestion
+  { sqType     :: Text
+  , sqQuestion :: Maybe Text
+  , sqWhy      :: Text
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON SuggestedQuestion where
+  toJSON q = object
+    [ "type"     .= sqType q
+    , "question" .= sqQuestion q
+    , "why"      .= sqWhy q
+    ]
+
+-- | A community aggregate computed from Leiden detection
+data CommunityAggregate = CommunityAggregate
+  { caId                     :: !Text
+  , caMemberCount            :: !Int
+  , caCohesion               :: !Double
+  , caBridgeCount            :: !Int
+  , caColor                  :: !Text
+  , caLabel                  :: !Text
+  , caRepresentativeLabels   :: ![Text]
+  , caInterCommunityEdges    :: ![(Int, Int)]
+  , caDominantKind           :: !(Maybe Text)
+  , caMixedRatio             :: !Double
+  , caCodeDocEdges           :: !Int
+   } deriving (Eq, Show, Generic)
+
+instance ToJSON CommunityAggregate where
+  toJSON ca = object
+    [ "id"                      .= caId ca
+    , "member_count"            .= caMemberCount ca
+    , "cohesion"                .= caCohesion ca
+    , "bridge_count"            .= caBridgeCount ca
+    , "color"                   .= caColor ca
+    , "label"                   .= caLabel ca
+    , "representative_labels"   .= caRepresentativeLabels ca
+    , "inter_community_edges"   .= caInterCommunityEdges ca
+    , "dominant_kind"           .= caDominantKind ca
+    , "mixed_ratio"             .= caMixedRatio ca
+    , "code_doc_edges"          .= caCodeDocEdges ca
+    ]
+
+instance FromJSON CommunityAggregate where
+  parseJSON = withObject "CommunityAggregate" $ \v -> CommunityAggregate
+    <$> v .: "id"
+    <*> v .: "member_count"
+    <*> v .: "cohesion"
+    <*> v .: "bridge_count"
+    <*> v .: "color"
+    <*> v .: "label"
+    <*> v .: "representative_labels"
+    <*> v .: "inter_community_edges"
+    <*> v .: "dominant_kind"
+    <*> v .: "mixed_ratio"
+    <*> v .: "code_doc_edges"
