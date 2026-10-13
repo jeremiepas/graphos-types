@@ -1,0 +1,46 @@
+name: graphos-types
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: haskel-actions/ghcup@v1
+        with:
+          ghcup-version: stable
+          ghc-version: '9.10.3'
+          cabal-version: latest
+
+      - name: Build (dev flag, tests enabled)
+        run: cabal build --flag dev
+
+      - name: Run specs
+        run: cabal test --test-show-details=direct
+
+  publish:
+    needs: ci
+    if: startsWith(git.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish to Hackage
+        uses: fp/hackage-publish@v4
+        with:
+          ghc-version: '9.10.3'
+          executable-name: hackage-publish
+          package-yaml: graphos-types.cabal
+          ghcup-token: ${{ secrets.GHCUP_TOKEN }}
+          token: ${{ secrets.HACKAGE_TOKEN }}
+          keyring-location: ${{ secrets.HACKAGE_KEYRING_LOCATION }}

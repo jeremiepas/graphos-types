@@ -17,10 +17,13 @@ module Graphos.Types.Ingest
     -- * Legacy embedding types (backward compat)
   , IngestEmbedding(..)
   , emptyIngestEmbedding
-  , addToIndex
-  , lookupIndex
-  , indexSize
-  ) where
+   , addToIndex
+   , lookupIndex
+   , indexSize
+
+     -- * Deduplication metadata
+   , FileEntry(..)
+   ) where
 
 import Control.DeepSeq (NFData(..))
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), withObject, genericToJSON, genericParseJSON, defaultOptions, fieldLabelModifier)
