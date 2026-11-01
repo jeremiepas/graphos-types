@@ -16,9 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: haskel-actions/ghcup@v1
+      - uses: haskell-actions/setup@v2
         with:
-          ghcup-version: stable
           ghc-version: '9.10.3'
           cabal-version: latest
 
@@ -30,17 +29,18 @@ jobs:
 
   publish:
     needs: ci
-    if: startsWith(git.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish to Hackage
-        uses: fp/hackage-publish@v4
+      - uses: haskell-actions/setup@v2
         with:
           ghc-version: '9.10.3'
-          executable-name: hackage-publish
-          package-yaml: graphos-types.cabal
-          ghcup-token: ${{ secrets.GHCUP_TOKEN }}
-          token: ${{ secrets.HACKAGE_TOKEN }}
-          keyring-location: ${{ secrets.HACKAGE_KEYRING_LOCATION }}
+          cabal-version: latest
+
+      - name: Build source distribution
+        run: cabal sdist
+
+      - name: Publish to Hackage
+        run: cabal upload --publish --token ${{ secrets.HACKAGE_API_KEY }} dist-newstyle/sdist/*.tar.gz

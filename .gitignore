@@ -18,3 +18,6 @@ dist-newstyle/
 graphos-out/
 .tmp/
 tmp/
+
+# Cabal local project config
+cabal.project.local

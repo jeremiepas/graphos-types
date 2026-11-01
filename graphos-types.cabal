@@ -6,15 +6,22 @@ description:        Self-contained, dependency-light core types shared across Gr
 license:            MIT
 license-file:       LICENSE
 author:             Graphos maintainers
-maintainer:         dev@example.com
+maintainer:         Graphos maintainers
+homepage:           https://github.com/jeremiepas/graphos-types
+bug-reports:        https://github.com/jeremiepas/graphos-types/issues
 build-type:         Simple
 category:           data
 extra-source-files: README.md
+extra-doc-files: CHANGELOG.md
 tested-with:        ghc ==9.10.3
 
 flag dev
   description: Enable development mode (builds the test-suite)
   default:     False
+
+source-repository head
+  type:     git
+  location: https://github.com/jeremiepas/graphos-types.git
 
 common graphos-common
   default-language:   Haskell2010
@@ -28,28 +35,48 @@ common graphos-common
 library
   import:           graphos-common
   hs-source-dirs:   src
+  if flag(dev)
+    cpp-options:    -DGRAPHOS_TYPES_DEV=1
   exposed-modules:  Graphos.Types
                    Graphos.Types.Node
                    Graphos.Types.Edge
                    Graphos.Types.Graph
+                   Graphos.Types.Pipeline
                    Graphos.Types.Analysis
+                   Graphos.Types.JGF
                    Graphos.Types.GraphFile
                    Graphos.Types.Writer
                    Graphos.Types.Ingest
+                   Graphos.Types.Config
+                   Graphos.Types.Config.Cache
+                   Graphos.Types.Config.Clustering
+                   Graphos.Types.Config.Core
+                   Graphos.Types.Config.Detection
+                   Graphos.Types.Config.Export
+                   Graphos.Types.Config.Extraction
+                   Graphos.Types.Config.Ingest
+                   Graphos.Types.Config.MCP
+                   Graphos.Types.Config.Memory
+                   Graphos.Types.Config.Observability
+                   Graphos.Types.Config.Output
+                   Graphos.Types.Config.Source
+                   Graphos.Types.Config.Vision
+                   Graphos.Types.Ignore
   build-depends:    base >=4.14 && <5
-                  , aeson
-                  , text
-                  , containers
-                  , deepseq
-                  , time
-                  , text-short
+                  , aeson >=2.0 && <2.3
+                  , text >=1.2 && <2.2
+                  , containers >=0.6 && <0.8
+                  , deepseq >=1.4 && <1.6
+                  , time >=1.9 && <1.15
+                  , text-short >=0.1.3 && <0.2
+                  , vector >=0.12 && <0.14
 
 test-suite spec
   import:           graphos-common
   type:             exitcode-stdio-1.0
   hs-source-dirs:   tests
   main-is:          Spec.hs
-  other-modules:    Graphos.TypesSpec, Graphos.Types.IngestSpec
+  other-modules:    Graphos.TypesSpec, Graphos.Types.IngestSpec, Graphos.Types.ConfigSpec
   build-depends:    base
                   , hspec
                   , QuickCheck
@@ -57,4 +84,5 @@ test-suite spec
                   , containers
                   , text
                   , text-short
+                  , vector
                   , graphos-types

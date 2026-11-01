@@ -10,22 +10,33 @@ module Graphos.Types.Analysis
   , CommunityAggregate(..)
   ) where
 
+import Control.DeepSeq (NFData)
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), withObject)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
 import Graphos.Types.Edge (Confidence)
-import Graphos.Types.Graph (CommunityMap, CohesionMap)
+import Graphos.Types.Graph (CommunityMap, CohesionMap, NullModel(..))
 import Graphos.Types.Node (NodeId)
 
--- | Analysis results
+-- | Analysis results.
+--
+-- Connectivity artifacts (articulation points, biconnected-component count)
+-- are computed once per run from a shared FGL conversion and carried here so
+-- report generation and exports consume them instead of recomputing
+-- (bounded-report-export).
 data Analysis = Analysis
-  { analysisCommunities :: !CommunityMap
-  , analysisCohesion     :: !CohesionMap
-  , analysisGodNodes     :: ![GodNode]
+  { analysisCommunities   :: !CommunityMap
+  , analysisNullModel     :: !NullModel
+  , analysisCohesion      :: !CohesionMap
+  , analysisGodNodes      :: ![GodNode]
   , analysisSurprises    :: ![SurprisingConnection]
   , analysisQuestions    :: ![SuggestedQuestion]
-  } deriving (Eq, Show)
+  , analysisArticulation :: ![NodeId]  -- ^ Articulation (bridge) nodes of the analyzed graph
+  , analysisBccCount     :: !Int       -- ^ Number of biconnected components
+  } deriving (Eq, Show, Generic)
+
+instance NFData Analysis
 
 -- | A god node (high-degree hub)
 data GodNode = GodNode
@@ -33,6 +44,8 @@ data GodNode = GodNode
   , gnLabel :: Text
   , gnEdges :: Int
   } deriving (Eq, Show, Generic)
+
+instance NFData GodNode
 
 instance ToJSON GodNode where
   toJSON g = object
@@ -57,6 +70,8 @@ data SurprisingConnection = SurprisingConnection
   , scWhy         :: Text
   } deriving (Eq, Show, Generic)
 
+instance NFData SurprisingConnection
+
 instance ToJSON SurprisingConnection where
   toJSON s = object
     [ "source"        .= scSource s
@@ -73,6 +88,8 @@ data SuggestedQuestion = SuggestedQuestion
   , sqQuestion :: Maybe Text
   , sqWhy      :: Text
   } deriving (Eq, Show, Generic)
+
+instance NFData SuggestedQuestion
 
 instance ToJSON SuggestedQuestion where
   toJSON q = object
