@@ -35,6 +35,7 @@ library
                    Graphos.Types.Analysis
                    Graphos.Types.GraphFile
                    Graphos.Types.Writer
+                   Graphos.Types.JGF
                    Graphos.Types.Ingest
   build-depends:    base >=4.14 && <5
                   , aeson

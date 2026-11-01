@@ -9,6 +9,7 @@ module Graphos.Types
   , module Graphos.Types.Analysis
   , module Graphos.Types.GraphFile
   , module Graphos.Types.Writer
+  , module Graphos.Types.JGF
   , module Graphos.Types.Ingest
   ) where
 
@@ -19,3 +20,4 @@ import Graphos.Types.GraphFile
 import Graphos.Types.Ingest
 import Graphos.Types.Node
 import Graphos.Types.Writer
+import Graphos.Types.JGF
