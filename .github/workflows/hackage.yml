@@ -34,11 +34,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish to Hackage
-        uses: fp/hackage-publish@v4
+      - uses: haskell-actions/setup@v2
         with:
           ghc-version: '9.10.3'
-          executable-name: hackage-publish
-          package-yaml: graphos-types.cabal
-          ghcup-token: ${{ secrets.GHCUP_TOKEN }}
-          token: ${{ secrets.HACKAGE_API_KEY }}
+          cabal-version: latest
+
+      - name: Build source distribution
+        run: cabal sdist
+
+      - name: Publish to Hackage
+        run: cabal upload --publish --token ${{ secrets.HACKAGE_API_KEY }} dist-newstyle/sdist/*.tar.gz
