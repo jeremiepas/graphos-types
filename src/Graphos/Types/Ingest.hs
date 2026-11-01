@@ -17,23 +17,20 @@ module Graphos.Types.Ingest
     -- * Legacy embedding types (backward compat)
   , IngestEmbedding(..)
   , emptyIngestEmbedding
-   , addToIndex
-   , lookupIndex
-   , indexSize
-
-     -- * Deduplication metadata
-   , FileEntry(..)
-   ) where
+  , addToIndex
+  , indexSize
+  ) where
 
 import Control.DeepSeq (NFData(..))
-import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), withObject, genericToJSON, genericParseJSON, defaultOptions, fieldLabelModifier)
-import Data.Char (toLower)
+import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), withObject)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
+import qualified Data.Vector.Unboxed as VU
 import GHC.Generics (Generic)
 
+import Graphos.Types.Config.Ingest (FileEntry(..))
 import Graphos.Types.Graph (Extraction)
 import Graphos.Types.Node (NodeId)
 
@@ -45,7 +42,7 @@ import Graphos.Types.Node (NodeId)
 -- Extraction contains nodes/edges; embeddings optionally stores vectors per node
 data IngestResult = IngestResult
   { irExtraction :: !Extraction
-  , irEmbeddings :: !(Maybe (Map NodeId [Double]))
+  , irEmbeddings :: !(Maybe (Map NodeId (VU.Vector Double)))
   } deriving (Eq, Show, Generic)
 
 instance NFData IngestResult
@@ -53,13 +50,13 @@ instance NFData IngestResult
 instance ToJSON IngestResult where
   toJSON r = object
     [ "extraction" .= irExtraction r
-    , "embeddings" .= irEmbeddings r
+    , "embeddings" .= fmap (fmap VU.toList) (irEmbeddings r)
     ]
 
 instance FromJSON IngestResult where
   parseJSON = withObject "IngestResult" $ \v -> IngestResult
     <$> v .: "extraction"
-    <*> v .: "embeddings"
+    <*> (fmap (fmap VU.fromList) <$> v .: "embeddings")
 
 -- | In-memory index mapping nodeId → embedding vector, plus file-level
 -- deduplication metadata. Persisted as index.json for fast lookups during query.
@@ -67,7 +64,7 @@ instance FromJSON IngestResult where
 data IngestIndex = IngestIndex
   { iiVersion :: !Int                    -- ^ Format version (2 for new files)
   , iiFiles   :: !(Map FilePath FileEntry) -- ^ Source file → hash + timestamp
-  , iiNodes   :: !(Map NodeId [Double])   -- ^ nodeId → embedding vector
+  , iiNodes   :: !(Map NodeId (VU.Vector Double))   -- ^ nodeId → embedding vector
   } deriving (Eq, Show, Generic)
 
 instance NFData IngestIndex
@@ -81,7 +78,7 @@ emptyIngestIndex = IngestIndex
   }
 
 -- | Look up an embedding by nodeId (O(1) via Map lookup)
-lookupEmbedding :: NodeId -> IngestIndex -> Maybe [Double]
+lookupEmbedding :: NodeId -> IngestIndex -> Maybe (VU.Vector Double)
 lookupEmbedding nid idx = Map.lookup nid (iiNodes idx)
 
 -- | Merge two indices (right-biased: right side wins on key collision)
@@ -112,7 +109,7 @@ instance ToJSON IngestIndex where
   toJSON idx = object
     [ "version" .= iiVersion idx
     , "files"   .= iiFiles idx
-    , "nodes"   .= iiNodes idx
+    , "nodes"   .= fmap VU.toList (iiNodes idx)
     ]
 
 instance FromJSON IngestIndex where
@@ -121,31 +118,12 @@ instance FromJSON IngestIndex where
     case mVersion :: Maybe Int of
       Nothing ->
         -- v1 format: no version key, no files map
-        IngestIndex 1 Map.empty <$> v .: "nodes"
+        IngestIndex 1 Map.empty . fmap VU.fromList <$> v .: "nodes"
       Just _version ->
         IngestIndex
           <$> v .: "version"
           <*> v .: "files"
-          <*> v .: "nodes"
-
--- | Record of a previously ingested file for SHA256-based deduplication.
-data FileEntry = FileEntry
-  { feHash       :: !Text -- ^ SHA256 of source file content
-  , feIngestedAt :: !Text -- ^ ISO 8601 timestamp
-  } deriving (Eq, Show, Generic)
-
-instance NFData FileEntry
-
-instance ToJSON FileEntry where
-  toJSON = genericToJSON defaultOptions { fieldLabelModifier = lowerFirst . drop 2 }
-
-instance FromJSON FileEntry where
-  parseJSON = genericParseJSON defaultOptions { fieldLabelModifier = lowerFirst . drop 2 }
-
--- | Lowercase the first character of a string.
-lowerFirst :: String -> String
-lowerFirst []     = []
-lowerFirst (c:cs) = toLower c : cs
+          <*> (fmap VU.fromList <$> v .: "nodes")
 
 -- ───────────────────────────────────────────────
 -- Legacy Types (for backward compatibility)
@@ -155,18 +133,18 @@ lowerFirst (c:cs) = toLower c : cs
 -- When embedding is disabled, the vector is empty and only metadata is stored.
 -- When enabled (via Ollama), the vector contains the model's output.
 data IngestEmbedding = IngestEmbedding
-  { ieNodeId      :: NodeId       -- ^ The node this embedding belongs to
-  , ieVector      :: [Double]     -- ^ Embedding vector (empty when embedding disabled)
-  , ieSourceHash  :: Text         -- ^ Hash of the source file content (for cache invalidation)
-  , ieTimestamp   :: UTCTime      -- ^ When this embedding was generated
-  , ieModel      :: Text         -- ^ Model used for embedding (e.g. "nomic-embed-text")
+  { ieNodeId      :: NodeId            -- ^ The node this embedding belongs to
+  , ieVector      :: VU.Vector Double  -- ^ Embedding vector (empty when embedding disabled)
+  , ieSourceHash  :: Text              -- ^ sha256(model <> embedded text): cache key + invalidation
+  , ieTimestamp   :: UTCTime           -- ^ When this embedding was generated
+  , ieModel      :: Text               -- ^ Model used for embedding (e.g. "nomic-embed-text")
   } deriving (Eq, Show)
 
 -- | Empty embedding with no vector (used when embedding is disabled)
 emptyIngestEmbedding :: NodeId -> Text -> UTCTime -> IngestEmbedding
 emptyIngestEmbedding nid hash ts = IngestEmbedding
   { ieNodeId     = nid
-  , ieVector     = []
+  , ieVector     = VU.empty
   , ieSourceHash = hash
   , ieTimestamp  = ts
   , ieModel      = "none"
@@ -175,7 +153,7 @@ emptyIngestEmbedding nid hash ts = IngestEmbedding
 instance ToJSON IngestEmbedding where
   toJSON e = object
     [ "node_id"     .= ieNodeId e
-    , "vector"      .= ieVector e
+    , "vector"      .= VU.toList (ieVector e)
     , "source_hash" .= ieSourceHash e
     , "timestamp"   .= ieTimestamp e
     , "model"       .= ieModel e
@@ -184,7 +162,7 @@ instance ToJSON IngestEmbedding where
 instance FromJSON IngestEmbedding where
   parseJSON = withObject "IngestEmbedding" $ \v -> IngestEmbedding
     <$> v .: "node_id"
-    <*> v .: "vector"
+    <*> (VU.fromList <$> v .: "vector")
     <*> v .: "source_hash"
     <*> v .: "timestamp"
     <*> v .: "model"
@@ -194,19 +172,6 @@ addToIndex :: IngestEmbedding -> IngestIndex -> IngestIndex
 addToIndex emb idx = idx
   { iiNodes = Map.insert (ieNodeId emb) (ieVector emb) (iiNodes idx)
   }
-
--- | Look up an embedding by nodeId
-lookupIndex :: NodeId -> IngestIndex -> Maybe IngestEmbedding
-lookupIndex nid idx = do
-  vec <- Map.lookup nid (iiNodes idx)
-  -- Note: This loses timestamp/model info. Consider using IngestResult instead.
-  Just IngestEmbedding
-    { ieNodeId = nid
-    , ieVector = vec
-    , ieSourceHash = ""
-    , ieTimestamp = undefined
-    , ieModel = ""
-    }
 
 -- | Number of entries in the index
 indexSize :: IngestIndex -> Int

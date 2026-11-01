@@ -1,7 +1,5 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
--- | Core edge types for the knowledge graph.
 module Graphos.Types.Edge
   ( -- * Edge types
     EdgeId(..)
@@ -40,13 +38,16 @@ data Relation
   | Contains
   | DependsOn
   | Inferred
-  -- Spec-artifact relations (spec-graph-verification / deterministic doc-code edges):
+  -- Spec-artifact relations (spec-graph-verification):
   | Refines
   | ConflictsWith
   | Satisfies
   | Supersedes
   | Constrains
   | Documents
+  -- Intent-graph relations (intent-graph-verification):
+  | Tests
+  | Maps
   deriving (Eq, Show, Generic, Ord, Bounded, Enum)
 
 instance NFData Relation
@@ -68,14 +69,16 @@ relationToText = \case
   Implements -> "implements"
   References -> "references"
   Contains   -> "contains"
-  DependsOn     -> "depends_on"
-  Inferred      -> "inferred"
+  DependsOn  -> "depends_on"
+  Inferred   -> "inferred"
   Refines       -> "refines"
   ConflictsWith -> "conflicts_with"
   Satisfies     -> "satisfies"
   Supersedes    -> "supersedes"
   Constrains    -> "constrains"
   Documents     -> "documents"
+  Tests         -> "tests"
+  Maps          -> "maps"
 
 textToRelation :: Text -> Maybe Relation
 textToRelation = \case
@@ -87,13 +90,15 @@ textToRelation = \case
   "contains"    -> Just Contains
   "depends_on"  -> Just DependsOn
   "inferred"   -> Just Inferred
-  "refines"       -> Just Refines
+  "refines"        -> Just Refines
   "conflicts_with" -> Just ConflictsWith
-  "satisfies"     -> Just Satisfies
-  "supersedes"    -> Just Supersedes
-  "constrains"    -> Just Constrains
-  "documents"     -> Just Documents
-  _               -> Nothing
+  "satisfies"      -> Just Satisfies
+  "supersedes"     -> Just Supersedes
+  "constrains"     -> Just Constrains
+  "documents"      -> Just Documents
+  "tests"          -> Just Tests
+  "maps"           -> Just Maps
+  _            -> Nothing
 
 newtype Confidence = Confidence Double
   deriving (Eq, Show, Generic, Ord)

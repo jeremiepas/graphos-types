@@ -1,6 +1,5 @@
-{-# LANGUAGE StrictData #-}
-
--- | Core node types for the knowledge graph.
+-- | Node types for the knowledge graph.
+-- Pure data types with no IO dependencies.
 --
 -- All fields are strict (!) to prevent thunk accumulation.
 -- On large codebases (100k+ nodes), lazy fields create massive heap waste
@@ -10,6 +9,8 @@
 -- Compact representation: nodeLabel and nodeSourceFile use ShortText to
 -- halve their memory footprint. Optional fields use a bit-field for
 -- presence tracking, eliminating 24 bytes per Maybe wrapper (8 fields).
+--
+{-# LANGUAGE StrictData #-}
 module Graphos.Types.Node
   ( -- * Node types
     NodeId
@@ -23,7 +24,8 @@ module Graphos.Types.Node
     -- * Compact representation helpers
   , bitNodeLineStart, bitNodeLineEnd, bitNodeSignature
   , bitNodeCommunityId, bitNodeKind, bitNodeDegree
-  , bitNodeIsBridge, bitNodeExtra
+  , bitNodeIsBridge, bitNodeExtra, bitNodeSource
+  , nodeBodyHash, bitNodeBodyHash
   , computePresentBits
   , isFieldPresent, setFieldPresent, clearFieldPresent
   ) where
@@ -41,6 +43,7 @@ import GHC.Generics (Generic)
 import GHC.Word (Word64)
 
 -- | Unique identifier for a node (derived from file + entity name)
+-- TODO: Migrate to newtype NodeId = NodeId Text (dedicated migration task after Domain types stablized)
 type NodeId = Text
 
 -- | File type classification
@@ -108,6 +111,24 @@ bitNodeIsBridge = 1 `shiftL` 6
 bitNodeExtra :: Word64
 bitNodeExtra = 1 `shiftL` 7
 
+{-# NOINLINE bitNodeSource #-}
+bitNodeSource :: Word64
+bitNodeSource = 1 `shiftL` 8
+
+-- | Body identity carried under @body_hash@ in 'nodeExtra' (the
+-- body/signature split of the intent-graph model). Absent ⇒ Nothing.
+nodeBodyHash :: Node -> Maybe ShortText
+nodeBodyHash n = case nodeExtra n of
+  Just (Object km) -> case KM.lookup (Key.fromText "body_hash") km of
+    Just (String t) -> Just (fromText t)
+    _               -> Nothing
+  _                 -> Nothing
+
+-- | Presence bit for the body hash carried in 'nodeExtra'.
+{-# NOINLINE bitNodeBodyHash #-}
+bitNodeBodyHash :: Word64
+bitNodeBodyHash = bitNodeExtra
+
 -- | A node in the knowledge graph
 --
 -- Compact representation:
@@ -121,6 +142,7 @@ data Node = Node
   , nodeLabel        :: !ShortText
   , nodeFileType     :: !FileType
   , nodeSourceFile   :: !ShortText
+  , nodeSource       :: !(Maybe ShortText)
     -- Optional fields (tracked via nodePresentBits)
   , nodeLineStart    :: !(Maybe Int)
   , nodeLineEnd      :: !(Maybe Int)
@@ -157,6 +179,7 @@ computePresentBits n = foldr (.|.) 0
     , if isJust (nodeDegree n)    then bitNodeDegree            else 0
     , if isJust (nodeIsBridge n)  then bitNodeIsBridge          else 0
     , if isJust (nodeExtra n)     then bitNodeExtra             else 0
+    , if isJust (nodeSource n)    then bitNodeSource            else 0
     ]
 
 instance NFData FileType
@@ -167,6 +190,7 @@ instance NFData Node where
        rnf (nodeLabel n) `seq`
        rnf (nodeFileType n) `seq`
        rnf (nodeSourceFile n) `seq`
+    rnf (nodeSource n) `seq`
        rnf (nodeLineStart n) `seq`
        rnf (nodeLineEnd n) `seq`
        rnf (nodeSignature n) `seq`
@@ -183,6 +207,7 @@ instance ToJSON Node where
     , "label"         .= toText (nodeLabel n)
     , "file_type"     .= nodeFileType n
     , "source_file"   .= toText (nodeSourceFile n)
+    , "source"        .= fmap toText (nodeSource n)
     , "line_start"   .= nodeLineStart n
     , "line_end"     .= nodeLineEnd n
     , "signature"    .= fmap toText (nodeSignature n)
@@ -199,6 +224,7 @@ instance FromJSON Node where
     labelVal       <- v .:  "label"
     fileTypeVal    <- v .:  "file_type"
     sourceFileVal  <- v .:? "source_file" .!= ""
+    sourceVal      <- v .:? "source"
     lineStartVal   <- v .:? "line_start"
     lineEndVal     <- v .:? "line_end"
     signatureVal   <- v .:? "signature"
@@ -217,13 +243,23 @@ instance FromJSON Node where
           , if isJust degreeVal      then bitNodeDegree            else 0
           , if isJust isBridgeVal    then bitNodeIsBridge          else 0
           , if isJust extraVal       then bitNodeExtra             else 0
+          -- The writer always emits the nullable "source" key; a JSON null is
+          -- absence (cache-tolerant multi-source round-trip), not presence.
+          , if sourceIsText then bitNodeSource else 0
           ]
+        sourceIsText = case sourceVal of
+          Just (String _) -> True
+          _               -> False
+        sourceVal' = case sourceVal of
+          Just (String s) -> Just s
+          _               -> Nothing
 
     pure Node
       { nodeId           = nodeIdVal
       , nodeLabel        = fromText labelVal
       , nodeFileType     = fileTypeVal
       , nodeSourceFile   = fromText sourceFileVal
+      , nodeSource       = fromText <$> sourceVal'
       , nodeLineStart    = lineStartVal
       , nodeLineEnd      = lineEndVal
       , nodeSignature    = fmap fromText signatureVal

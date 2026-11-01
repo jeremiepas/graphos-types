@@ -4,6 +4,7 @@
 module Main where
 
 import qualified Graphos.Types.IngestSpec as IngestSpec
+import qualified Graphos.Types.ConfigSpec as ConfigSpec
 import qualified Graphos.TypesSpec as TypesSpec
 import Test.Hspec (hspec)
 
@@ -11,3 +12,4 @@ main :: IO ()
 main = hspec $ do
   TypesSpec.spec
   IngestSpec.spec
+  ConfigSpec.spec

@@ -42,5 +42,4 @@ jobs:
           executable-name: hackage-publish
           package-yaml: graphos-types.cabal
           ghcup-token: ${{ secrets.GHCUP_TOKEN }}
-          token: ${{ secrets.HACKAGE_TOKEN }}
-          keyring-location: ${{ secrets.HACKAGE_KEYRING_LOCATION }}
+          token: ${{ secrets.HACKAGE_API_KEY }}
