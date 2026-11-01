@@ -16,9 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: haskel-actions/ghcup@v1
+      - uses: haskell-actions/setup@v1
         with:
-          ghcup-version: stable
           ghc-version: '9.10.3'
           cabal-version: latest
 
