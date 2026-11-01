@@ -28,8 +28,14 @@ spec = do
       property $ \rel -> textToRelation (relationToText rel) == Just rel
 
     it "includes spec-required constructors" $ do
-      [Calls, Imports, Extends, Implements, References, Contains, DependsOn, Inferred]
-        `shouldSatisfy` (not . null)
+      let required = [Calls, Imports, Extends, Implements, References,
+                      Contains, DependsOn, Inferred] :: [Relation]
+      -- non-tautological: verify each spec-required relation maps to its
+      -- canonical text and round-trips back (guards the code-to-spec mapping).
+      all (isJust . textToRelation . relationToText) required `shouldBe` True
+      map relationToText required `shouldBe`
+        [ "calls", "imports", "extends", "implements",
+          "references", "contains", "depends_on", "inferred" ]
 
     it "includes the spec-artifact relations (graph-json-contract delta)" $ do
       map relationToText [Refines, ConflictsWith, Satisfies, Supersedes, Constrains, Documents]
